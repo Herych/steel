@@ -1,0 +1,72 @@
+version: '3.3'
+
+services:
+# Если хотите подключить базу данных
+  db:
+    container_name: database
+    image: postgres
+    env_file:
+      - ".env"
+    environment:
+      POSTGRES_PASSWORD: $DB_PASS
+      POSTGRES_USER: $DB_USER
+      POSTGRES_DB: $DB_NAME
+    restart: always
+    ports:
+      - 9988:5432
+    networks:
+      - botnet
+    volumes:
+      - ./postgresql:/var/lib/postgresql
+  tgbot:
+    container_name: bot
+    build:
+      context: .
+    command: python app.py
+    volumes:
+      - .:/src
+    networks:
+      - botnet
+    restart: always
+    env_file:
+      - ".env"
+    # Бот стартует после запуска базы
+    depends_on:
+      - db
+      - django
+  django:
+    container_name: djangoproject
+    build:
+      context: .
+    #command: python django_app.py runserver 0.0.0.0:8000 --noreload
+    #command: gunicorn django_project.telegrambot.telegrambot.wsgi:application --bind 0.0.0.0:8000
+    ports:
+      - 8000:8000
+    networks:
+      - botnet
+    restart: always
+
+    volumes:
+      - .:/src
+      - static:/static
+    env_file:
+      - ".env"
+    # Бот стартует после запуска базы
+    depends_on:
+      - db
+  nginx:
+    build: ./nginx
+    volumes:
+      - static:/static
+    ports:
+      - "80:80"
+    depends_on:
+      - django
+
+volumes:
+  static:
+# указываются используемые сети
+networks:
+  botnet:
+    # указывается драйвер сети
+    driver: bridge
